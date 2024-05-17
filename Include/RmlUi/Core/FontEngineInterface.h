@@ -28,6 +28,7 @@
 #ifndef RMLUI_CORE_FONTENGINEINTERFACE_H
 #define RMLUI_CORE_FONTENGINEINTERFACE_H
 
+#include "FontMatch.h"
 #include "FontMetrics.h"
 #include "Header.h"
 #include "Mesh.h"
@@ -71,6 +72,12 @@ public:
 	/// @return True if the face was loaded successfully, false otherwise.
 	/// @note The debugger plugin will load its embedded font faces through this method using the family name 'rmlui-debugger-font'.
 	virtual bool LoadFontFace(Span<const byte> data, const String& family, Style::FontStyle style, Style::FontWeight weight, bool fallback_face);
+
+	/// Called by RmlUi when it wants to construct a custom font family.
+	/// @param[in] family The name to register the font family as.
+	/// @param[in] fonts Descriptors of existing font families to use in priority order.
+	/// @return True if the font family was constructed successfully, false otherwise.
+	virtual bool CreateCustomFontFamily(const String& family, Span<const FontMatch> fonts);
 
 	/// Called by RmlUi when a font configuration is resolved for an element. Should return a handle that
 	/// can later be used to resolve properties of the face, and generate string geometry to be rendered.

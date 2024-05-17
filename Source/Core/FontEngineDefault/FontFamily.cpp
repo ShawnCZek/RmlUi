@@ -78,7 +78,7 @@ FontFaceHandleDefault* FontFamily::GetFaceHandle(Style::FontStyle style, Style::
 
 FontFace* FontFamily::AddFace(FontFaceHandleFreetype ft_face, Style::FontStyle style, Style::FontWeight weight, UniquePtr<byte[]> face_memory)
 {
-	auto face = MakeUnique<FontFace>(ft_face, style, weight);
+	auto face = MakeShared<FontFace>(ft_face, style, weight);
 	FontFace* result = face.get();
 
 	font_faces.push_back(FontFaceEntry{std::move(face), std::move(face_memory)});

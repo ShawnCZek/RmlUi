@@ -357,6 +357,11 @@ bool LoadFontFace(Span<const byte> data, const String& family, Style::FontStyle 
 	return font_interface->LoadFontFace(data, family, style, weight, fallback_face);
 }
 
+bool CreateCustomFontFamily(const String& family, Span<const FontMatch> fonts)
+{
+	return font_interface->CreateCustomFontFamily(family, fonts);
+}
+
 void RegisterPlugin(Plugin* plugin)
 {
 	if (initialised)

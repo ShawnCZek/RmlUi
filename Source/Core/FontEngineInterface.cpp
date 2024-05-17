@@ -50,6 +50,11 @@ bool FontEngineInterface::LoadFontFace(Span<const byte> /*data*/, const String& 
 	return false;
 }
 
+bool FontEngineInterface::CreateCustomFontFamily(const String& /*family*/, Span<const FontMatch> /*fonts*/)
+{
+	return false;
+}
+
 FontFaceHandle FontEngineInterface::GetFontFaceHandle(const String& /*family*/, Style::FontStyle /*style*/, Style::FontWeight /*weight*/,
 	int /*size*/)
 {

@@ -43,6 +43,7 @@ class FontEngineInterface;
 class RenderInterface;
 class SystemInterface;
 class TextInputHandler;
+struct FontMatch;
 enum class DefaultActionPhase;
 
 /**
@@ -147,6 +148,12 @@ RMLUICORE_API bool LoadFontFace(const String& file_path, bool fallback_face = fa
 /// @lifetime The pointed to 'data' must remain available until after the call to Rml::Shutdown.
 RMLUICORE_API bool LoadFontFace(Span<const byte> data, const String& family, Style::FontStyle style,
 	Style::FontWeight weight = Style::FontWeight::Auto, bool fallback_face = false);
+
+/// Constructs a new font family.
+/// @param[in] family The name to register the font family as.
+/// @param[in] fonts Descriptors of existing font families to use in priority order.
+/// @return True if the font family was constructed successfully, false otherwise.
+RMLUICORE_API bool CreateCustomFontFamily(const String& family, Span<const FontMatch> fonts);
 
 /// Registers a generic RmlUi plugin.
 RMLUICORE_API void RegisterPlugin(Plugin* plugin);

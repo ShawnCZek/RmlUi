@@ -67,7 +67,7 @@ protected:
 	String name;
 
 	struct FontFaceEntry {
-		UniquePtr<FontFace> face;
+		SharedPtr<FontFace> face;
 		// Only filled if we own the memory used by the face's FreeType handle. May be shared with other faces in this family.
 		UniquePtr<byte[]> face_memory;
 	};
