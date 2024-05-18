@@ -45,6 +45,10 @@ public:
 	FontFace(FontFaceHandleFreetype face, Style::FontStyle style, Style::FontWeight weight);
 	~FontFace();
 
+	/// Adopts the memory used by the face's FreeType handle.
+	/// @param[in] face_memory The memory used by the face's FreeType handle.
+	void AdoptFaceMemory(UniquePtr<byte[]> face_memory);
+
 	Style::FontStyle GetStyle() const;
 	Style::FontWeight GetWeight() const;
 
@@ -66,6 +70,9 @@ private:
 	HandleMap handles;
 
 	FontFaceHandleFreetype face;
+
+	// Only filled if we own the memory used by the face's FreeType handle. May be shared with other faces in the family.
+	UniquePtr<byte[]> face_memory;
 };
 
 } // namespace Rml
