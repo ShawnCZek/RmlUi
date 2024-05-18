@@ -38,6 +38,7 @@ namespace Rml {
 class FontFace;
 class FontFamily;
 class FontFaceHandleDefault;
+struct FontMatch;
 
 /**
     The font provider contains all font families currently in use by RmlUi.
@@ -65,6 +66,9 @@ public:
 	/// Adds a new font face from memory.
 	static bool LoadFontFace(Span<const byte> data, const String& font_family, Style::FontStyle style, Style::FontWeight weight, bool fallback_face);
 
+	/// Constructs a custom font family from existing font faces.
+	static bool CreateCustomFontFamily(const String& family, Span<const FontMatch> fonts);
+
 	/// Return the number of fallback font faces.
 	static int CountFallbackFontFaces();
 
@@ -86,8 +90,10 @@ private:
 	bool AddFace(FontFaceHandleFreetype face, const String& family, Style::FontStyle style, Style::FontWeight weight, bool fallback_face,
 		UniquePtr<byte[]> face_memory);
 
+	bool CreateFontFamily(const String& family, Span<const FontMatch> fonts);
+
 	using FontFaceList = Vector<FontFace*>;
-	using FontFamilyMap = UnorderedMap<String, UniquePtr<FontFamily>>;
+	using FontFamilyMap = UnorderedMap<String, SharedPtr<FontFamily>>;
 
 	FontFamilyMap font_families;
 	FontFaceList fallback_font_faces;

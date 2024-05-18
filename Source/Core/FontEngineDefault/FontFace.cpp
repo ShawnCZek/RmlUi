@@ -46,6 +46,11 @@ FontFace::~FontFace()
 		FreeType::ReleaseFace(face);
 }
 
+void FontFace::AdoptFaceMemory(UniquePtr<byte[]> _face_memory)
+{
+	face_memory = std::move(_face_memory);
+}
+
 Style::FontStyle FontFace::GetStyle() const
 {
 	return style;

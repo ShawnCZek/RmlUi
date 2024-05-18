@@ -36,13 +36,7 @@ namespace Rml {
 
 FontFamily::FontFamily(const String& name) : name(name) {}
 
-FontFamily::~FontFamily()
-{
-	// Multiple face entries may share memory within a single font family, although only one of them owns it. Here we make sure that all the face
-	// destructors are run before all the memory is released. This way we don't leave any hanging references to invalidated memory.
-	for (FontFaceEntry& entry : font_faces)
-		entry.face.reset();
-}
+FontFamily::~FontFamily() = default;
 
 FontFaceHandleDefault* FontFamily::GetFaceHandle(Style::FontStyle style, Style::FontWeight weight, int size)
 {
@@ -50,7 +44,7 @@ FontFaceHandleDefault* FontFamily::GetFaceHandle(Style::FontStyle style, Style::
 	FontFace* matching_face = nullptr;
 	for (size_t i = 0; i < font_faces.size(); i++)
 	{
-		FontFace* face = font_faces[i].face.get();
+		FontFace* face = font_faces[i].get();
 
 		if (face->GetStyle() == style)
 		{
@@ -79,17 +73,27 @@ FontFaceHandleDefault* FontFamily::GetFaceHandle(Style::FontStyle style, Style::
 FontFace* FontFamily::AddFace(FontFaceHandleFreetype ft_face, Style::FontStyle style, Style::FontWeight weight, UniquePtr<byte[]> face_memory)
 {
 	auto face = MakeShared<FontFace>(ft_face, style, weight);
-	FontFace* result = face.get();
+	face->AdoptFaceMemory(std::move(face_memory));
 
-	font_faces.push_back(FontFaceEntry{std::move(face), std::move(face_memory)});
+	font_faces.push_back(std::move(face));
 
-	return result;
+	return font_faces.back().get();
+}
+
+void FontFamily::AddSubFontFamily(SharedPtr<FontFamily> font_family, Vector<Pair<char32_t, char32_t>> character_ranges,
+	Pair<Style::FontWeight, Style::FontWeight> font_weights)
+{
+	RMLUI_ASSERT(font_family);
+	RMLUI_ASSERT((int)font_weights.first >= 1 && (int)font_weights.first <= 1000);
+	RMLUI_ASSERT((int)font_weights.second >= 1 && (int)font_weights.second <= 1000);
+
+	sub_font_families.push_back(SubFontFamily{font_family, std::move(character_ranges), font_weights});
 }
 
 void FontFamily::ReleaseFontResources()
 {
-	for (auto& entry : font_faces)
-		entry.face->ReleaseFontResources();
+	for (SharedPtr<FontFace>& entry : font_faces)
+		entry->ReleaseFontResources();
 }
 
 } // namespace Rml

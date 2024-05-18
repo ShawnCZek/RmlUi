@@ -35,6 +35,7 @@ namespace Rml {
 
 class FontFace;
 class FontFaceHandleDefault;
+struct SubFontFamily;
 
 /**
     @author Peter Curry
@@ -60,20 +61,32 @@ public:
 	/// @return True if the face was loaded successfully, false otherwise.
 	FontFace* AddFace(FontFaceHandleFreetype ft_face, Style::FontStyle style, Style::FontWeight weight, UniquePtr<byte[]> face_memory);
 
+	/// Appends an existing font family into this family, creating a composite font.
+	/// @param[in] font_family The font family to be linked.
+	/// @param[in] character_ranges The character ranges for which the font family is used.
+	/// @param[in] font_weights The range of font weights covered by the font family.
+	void AddSubFontFamily(SharedPtr<FontFamily> font_family, Vector<Pair<char32_t, char32_t>> character_ranges,
+		Pair<Style::FontWeight, Style::FontWeight> font_weights);
+
 	/// Releases resources owned by sized font faces, including their textures and rendered glyphs.
 	void ReleaseFontResources();
 
 protected:
 	String name;
 
-	struct FontFaceEntry {
-		SharedPtr<FontFace> face;
-		// Only filled if we own the memory used by the face's FreeType handle. May be shared with other faces in this family.
-		UniquePtr<byte[]> face_memory;
-	};
-
-	using FontFaceList = Vector<FontFaceEntry>;
+	using FontFaceList = Vector<SharedPtr<FontFace>>;
 	FontFaceList font_faces;
+
+	// A list of font families this font family consists of. Used for composite fonts.
+	Vector<SubFontFamily> sub_font_families;
+};
+
+struct SubFontFamily {
+	WeakPtr<FontFamily> font_family;
+	// List of character ranges covered by the font family. If it is empty, the font's character map is used.
+	Vector<Pair<char32_t, char32_t>> character_ranges;
+	// The range of font weights that the font family covers.
+	Pair<Style::FontWeight, Style::FontWeight> font_weights;
 };
 
 } // namespace Rml

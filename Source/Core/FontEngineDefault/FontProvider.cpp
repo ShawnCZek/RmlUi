@@ -29,6 +29,7 @@
 #include "FontProvider.h"
 #include "../../../Include/RmlUi/Core/Core.h"
 #include "../../../Include/RmlUi/Core/FileInterface.h"
+#include "../../../Include/RmlUi/Core/FontMatch.h"
 #include "../../../Include/RmlUi/Core/Log.h"
 #include "../../../Include/RmlUi/Core/Math.h"
 #include "../../../Include/RmlUi/Core/StringUtilities.h"
@@ -143,6 +144,30 @@ bool FontProvider::LoadFontFace(Span<const byte> data, const String& font_family
 	return result;
 }
 
+bool FontProvider::CreateCustomFontFamily(const String& family, Span<const FontMatch> fonts)
+{
+	if (fonts.empty())
+	{
+		return false;
+	}
+
+	String family_standardized = StringUtilities::ToLower(family);
+
+	if (Get().font_families.count(family_standardized) > 0)
+	{
+		Log::Message(Log::LT_ERROR, "Failed to create a font family '%s': The name is taken.", family.c_str());
+		return false;
+	}
+
+	if (!Get().CreateFontFamily(family_standardized, fonts))
+	{
+		Log::Message(Log::LT_ERROR, "Failed to create a font family '%s'.", family.c_str());
+		return false;
+	}
+
+	return true;
+}
+
 bool FontProvider::LoadFontFace(Span<const byte> data, bool fallback_face, UniquePtr<byte[]> face_memory, const String& source, String font_family,
 	Style::FontStyle style, Style::FontWeight weight)
 {
@@ -244,7 +269,7 @@ bool FontProvider::AddFace(FontFaceHandleFreetype face, const String& family, St
 	}
 	else
 	{
-		auto font_family_ptr = MakeUnique<FontFamily>(family_lower);
+		auto font_family_ptr = MakeShared<FontFamily>(family_lower);
 		font_family = font_family_ptr.get();
 		font_families[family_lower] = std::move(font_family_ptr);
 	}
@@ -261,6 +286,56 @@ bool FontProvider::AddFace(FontFaceHandleFreetype face, const String& family, St
 	}
 
 	return static_cast<bool>(font_face_result);
+}
+
+bool FontProvider::CreateFontFamily(const String& family, Span<const FontMatch> fonts)
+{
+	RMLUI_ASSERTMSG(family == StringUtilities::ToLower(family), "Font family name must be converted to lowercase before entering here.");
+
+	auto font_family = MakeShared<FontFamily>(family);
+	int loaded_sub_font_families = 0;
+
+	for (const FontMatch& font_match : fonts)
+	{
+		const String font_match_name(font_match.name);
+		auto it = font_families.find(StringUtilities::ToLower(font_match_name));
+
+		if (it == font_families.end())
+		{
+			Log::Message(Log::LT_WARNING, "Failed to find font family: '%s'", font_match_name.c_str());
+			continue;
+		}
+
+		Vector<Pair<char32_t, char32_t>> character_ranges(font_match.character_ranges.begin(), font_match.character_ranges.end());
+		Pair<Style::FontWeight, Style::FontWeight> font_weights(font_match.font_weight);
+
+		// Fix character ranges with an incorrect order of components.
+		for (Pair<char32_t, char32_t>& character_range : character_ranges)
+			if (character_range.second < character_range.first)
+				std::swap(character_range.first, character_range.second);
+
+		// Fix the font weight range in case the order of components is incorrect.
+		if (font_weights.second < font_weights.first)
+			std::swap(font_weights.first, font_weights.second);
+
+		// If either of the font weight range components is set to Auto, automatically include the entire range.
+		if (font_weights.first == Style::FontWeight::Auto || font_weights.second == Style::FontWeight::Auto)
+			font_weights = {Style::FontWeight(1), Style::FontWeight(1000)};
+
+		font_weights.first = (Style::FontWeight)Math::Clamp((int)font_weights.first, 1, 1000);
+		font_weights.second = (Style::FontWeight)Math::Clamp((int)font_weights.second, 1, 1000);
+
+		font_family->AddSubFontFamily(it->second, std::move(character_ranges), font_weights);
+		++loaded_sub_font_families;
+	}
+
+	if (loaded_sub_font_families == 0)
+	{
+		return false;
+	}
+
+	font_families[family] = std::move(font_family);
+	return true;
 }
 
 } // namespace Rml
