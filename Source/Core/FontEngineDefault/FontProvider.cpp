@@ -147,9 +147,7 @@ bool FontProvider::LoadFontFace(Span<const byte> data, const String& font_family
 bool FontProvider::CreateCustomFontFamily(const String& family, Span<const FontMatch> fonts)
 {
 	if (fonts.empty())
-	{
 		return false;
-	}
 
 	String family_standardized = StringUtilities::ToLower(family);
 
@@ -330,9 +328,7 @@ bool FontProvider::CreateFontFamily(const String& family, Span<const FontMatch> 
 	}
 
 	if (loaded_sub_font_families == 0)
-	{
 		return false;
-	}
 
 	font_families[family] = std::move(font_family);
 	return true;
