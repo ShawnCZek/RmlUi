@@ -69,6 +69,7 @@ public:
 
 	// Available after Parse()
 	StringList GetVariableNameList() const;
+	StringList GetVariableAddresses() const;
 	// Available after Parse()
 	bool HasAddressDependency(const DataAddress& match_address) const;
 

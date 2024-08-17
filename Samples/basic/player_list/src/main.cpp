@@ -121,13 +121,18 @@ public:
 
 		// Filter();
 		// Sort();
-		//
+
+		if (entries.empty())
+			data_model.DirtyVariable("players");
 
 		entries = data;
 
 		RMLUI_ASSERT(data_model);
 		data_model.DirtyVariable("players[5].score");
 		// data_model.DirtyVariable("players");
+
+		// for (size_t i = 0; i < entries.size(); ++i)
+		//	data_model.DirtyVariable(Rml::CreateString("players[%llu].score", i));
 
 		last_update = t;
 	}

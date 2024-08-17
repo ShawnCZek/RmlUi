@@ -1167,6 +1167,17 @@ StringList DataExpression::GetVariableNameList() const
 	return list;
 }
 
+String DataAddressToString(const DataAddress& address);
+
+StringList DataExpression::GetVariableAddresses() const
+{
+	StringList list;
+	list.reserve(addresses.size());
+	for (const DataAddress& address : addresses)
+		list.push_back(DataAddressToString(address));
+	return list;
+}
+
 bool DataExpression::HasAddressDependency(const DataAddress& match_address) const
 {
 	for (const DataAddress& address : addresses)

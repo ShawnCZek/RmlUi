@@ -75,6 +75,12 @@ bool DataViewCommon::HasAddressDependency(const DataAddress& address) const
 	return expression->HasAddressDependency(address);
 }
 
+void DataViewCommon::RegisterDependencies(DataViews& parent)
+{
+	for (const String& address : expression->GetVariableAddresses())
+		parent.RegisterExpressionViewDependency(address, this);
+}
+
 const String& DataViewCommon::GetModifier() const
 {
 	return modifier;
@@ -440,6 +446,13 @@ bool DataViewText::HasAddressDependency(const DataAddress& address) const
 	return false;
 }
 
+void DataViewText::RegisterDependencies(DataViews& parent)
+{
+	for (const DataEntry& entry : data_entries)
+		for (const String& address : entry.data_expression->GetVariableAddresses())
+			parent.RegisterExpressionViewDependency(address, this);
+}
+
 void DataViewText::Release()
 {
 	delete this;
@@ -603,6 +616,14 @@ bool DataViewFor::HasAddressDependency(const DataAddress& address) const
 	return true;
 }
 
+String DataAddressToString(const DataAddress& address);
+
+void DataViewFor::RegisterDependencies(DataViews& parent)
+{
+	const String address = DataAddressToString(container_address);
+	parent.RegisterExpressionViewDependency(address, this);
+}
+
 void DataViewFor::Release()
 {
 	delete this;
@@ -635,6 +656,11 @@ bool DataViewAlias::HasAddressDependency(const DataAddress& /*address*/) const
 {
 	// TODO
 	return true;
+}
+
+void DataViewAlias::RegisterDependencies(DataViews& /*parent*/)
+{
+	// TODO
 }
 
 void DataViewAlias::Release()

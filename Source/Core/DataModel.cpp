@@ -101,7 +101,7 @@ static const char* LegalVariableName(const String& name)
 	return nullptr;
 }
 
-static String DataAddressToString(const DataAddress& address)
+String DataAddressToString(const DataAddress& address)
 {
 	String result;
 	bool is_first = true;

@@ -50,6 +50,8 @@ public:
 
 	bool HasAddressDependency(const DataAddress& address) const override;
 
+	void RegisterDependencies(DataViews& parent) override;
+
 protected:
 	const String& GetModifier() const;
 	DataExpression& GetExpression();
@@ -138,6 +140,8 @@ public:
 
 	bool HasAddressDependency(const DataAddress& address) const override;
 
+	void RegisterDependencies(DataViews& parent) override;
+
 protected:
 	void Release() override;
 
@@ -166,6 +170,8 @@ public:
 
 	bool HasAddressDependency(const DataAddress& address) const override;
 
+	void RegisterDependencies(DataViews& parent) override;
+
 protected:
 	void Release() override;
 
@@ -187,6 +193,8 @@ public:
 	bool Initialize(DataModel& model, Element* element, const String& expression, const String& modifier) override;
 
 	bool HasAddressDependency(const DataAddress& address) const override;
+
+	void RegisterDependencies(DataViews& parent) override;
 
 protected:
 	void Release() override;

@@ -38,6 +38,7 @@ namespace Rml {
 
 class Element;
 class DataModel;
+class DataViews;
 
 class DataViewInstancer : public NonCopyMoveable {
 public:
@@ -74,6 +75,10 @@ public:
 	// @param[in] modifier_or_inner_rml The modifier for the given view type (see above), or the inner rml contents for structural data views.
 	// @return True on success.
 	virtual bool Initialize(DataModel& model, Element* element, const String& expression, const String& modifier_or_inner_rml) = 0;
+
+	// Register dependencies between expression addresses and this data view to its parent.
+	// @param[in] parent The manager responsible for all data views.
+	virtual void RegisterDependencies(DataViews& parent) = 0;
 
 	// Update the data view.
 	// Returns true if the update resulted in a document change.
@@ -117,6 +122,8 @@ public:
 
 	bool Update(DataModel& model, const DirtyVariables& dirty_variables);
 
+	void RegisterExpressionViewDependency(const String& name, DataView* view);
+
 private:
 	using DataViewList = Vector<DataViewPtr>;
 
@@ -127,6 +134,7 @@ private:
 
 	using NameViewMap = UnorderedMultimap<String, DataView*>;
 	NameViewMap name_view_map;
+	NameViewMap dependency_view_map;
 };
 
 } // namespace Rml

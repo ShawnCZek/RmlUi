@@ -113,6 +113,8 @@ bool DataViews::Update(DataModel& model, const DirtyVariables& dirty_variables)
 				for (const String& variable_name : view->GetVariableNameList())
 					name_view_map.emplace(variable_name, view.get());
 
+				view->RegisterDependencies(*this);
+
 				views.push_back(std::move(view));
 			}
 			views_to_add.clear();
@@ -121,12 +123,16 @@ bool DataViews::Update(DataModel& model, const DirtyVariables& dirty_variables)
 		for (const String& variable_name : dirty_variables)
 		{
 			DataAddress address = model.ResolveAddress(variable_name, nullptr);
-			if (address.empty())
-				continue;
-			auto pair = name_view_map.equal_range(address.front().name);
-			for (auto it = pair.first; it != pair.second; ++it)
+			if (address.size() == 1)
 			{
-				if (address.size() <= 1 || it->second->HasAddressDependency(address))
+				auto pair = name_view_map.equal_range(address.front().name);
+				for (auto it = pair.first; it != pair.second; ++it)
+					dirty_views.push_back(it->second);
+			}
+			else if (!address.empty())
+			{
+				auto pair = dependency_view_map.equal_range(variable_name);
+				for (auto it = pair.first; it != pair.second; ++it)
 					dirty_views.push_back(it->second);
 			}
 		}
@@ -167,6 +173,14 @@ bool DataViews::Update(DataModel& model, const DirtyVariables& dirty_variables)
 					else
 						++it;
 				}
+
+				for (auto it = dependency_view_map.begin(); it != dependency_view_map.end();)
+				{
+					if (it->second == view.get())
+						it = dependency_view_map.erase(it);
+					else
+						++it;
+				}
 			}
 
 			views_to_remove.clear();
@@ -174,6 +188,11 @@ bool DataViews::Update(DataModel& model, const DirtyVariables& dirty_variables)
 	}
 
 	return result;
+}
+
+void DataViews::RegisterExpressionViewDependency(const String& name, DataView* view)
+{
+	dependency_view_map.emplace(name, view);
 }
 
 } // namespace Rml
