@@ -18,7 +18,7 @@ body {
     font-size: 15dp;
 }
 
-table {
+table, table_fast {
     box-sizing: border-box;
     display: table;
 }
@@ -103,29 +103,33 @@ input[type="text"] {
     overflow: scroll;
 }
 
-table {
+table, table_fast {
     width: 100%;
 }
 
-table thead tr {
+table thead tr, table_fast thead tr {
     font-weight: bold;
     padding-bottom: 1dp;
 }
 
-table td {
+table td, table_fast td {
     padding: 2dp 4dp;
 }
 
-table td.data_column {
+table td.data_column, table_fast td.data_column {
     width: 70dp;
     text-align: center;
 }
 
-table tbody td.data_column {
+table tbody tr, table_fast tbody tr:not(.filler_top):not(.filler_bottom) {
+    height: 22dp;
+}
+
+table tbody td.data_column, table_fast tbody td.data_column {
     font-size: .9em;
 }
 
-table td.tag_column {
+table td.tag_column, table_fast td.tag_column {
     width: 100dp;
 }
 

@@ -22,7 +22,7 @@
 			</div>
 
 			<div id="players">
-				<table>
+				<table_fast>
 					<thead>
 						<tr>
 							<td class="data_column">ID</td>
@@ -34,15 +34,19 @@
 					</thead>
 
 					<tbody data-model="player_list">
-						<tr data-for="player : players" data-attr-data-id="player.id">
+						<tr class="filler_top"></tr>
+
+						<tr data-for="player, it : players" data-attr-data-id="player.id" data-attr-data-order="it">
 							<td class="data_column">{{player.id}}</td>
 							<td data-style-color="player.tag_color">{{player.tag_name}}</td>
 							<td>{{player.name}}</td>
 							<td class="data_column">{{player.latency}} ms</td>
 							<td class="data_column">{{player.score}}</td>
 						</tr>
+
+						<tr class="filler_bottom"></tr>
 					</tbody>
-				</table>
+				</table_fast>
 			</div>
 
 			<div id="contents__footer" data-model="player_list">

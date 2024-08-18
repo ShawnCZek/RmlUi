@@ -26,12 +26,13 @@
  *
  */
 
+#include "FastTableElement.h"
 #include <RmlUi/Core.h>
 #include <RmlUi/Debugger.h>
 #include <RmlUi_Backend.h>
 #include <Shell.h>
 
-static const int GENERATED_PLAYER_COUNT = 100;
+static const int GENERATED_PLAYER_COUNT = 150;
 
 class PlayerEntry {
 public:
@@ -66,6 +67,8 @@ public:
 		}
 	}
 };
+
+PlayerEntry GenerateFakePlayerEntry(bool is_local);
 
 class PlayerList final : public Rml::EventListener {
 public:
@@ -106,7 +109,7 @@ public:
 
 	void Update(double t)
 	{
-		if (t < last_update + 0.5)
+		if (t < last_update + 2.0)
 			return;
 
 		RMLUI_ZoneScoped;
@@ -234,6 +237,9 @@ int main(int /*argc*/, char** /*argv*/)
 	// RmlUi initialisation.
 	Rml::Initialise();
 
+	Rml::UniquePtr<Rml::ElementInstancer> table_instancer = Rml::MakeUnique<Rml::ElementInstancerGeneric<FastTableElement>>();
+	Rml::Factory::RegisterElementInstancer("table_fast", table_instancer.get());
+
 	// Create the main RmlUi context.
 	Rml::Context* context = Rml::CreateContext("main", Rml::Vector2i(width, height));
 
@@ -279,25 +285,26 @@ int main(int /*argc*/, char** /*argv*/)
 	return 0;
 }
 
+PlayerEntry GenerateFakePlayerEntry(bool is_local)
+{
+	PlayerEntry data{};
+	data.is_local = is_local;
+	data.entity_id = (uint32_t)Rml::Math::RandomInteger(100'000);
+	data.score = (uint32_t)Rml::Math::RandomInteger(100);
+	data.latency = (uint16_t)Rml::Math::RandomInteger(500);
+	data.is_muted = Rml::Math::RandomBool();
+	data.is_friend = Rml::Math::RandomBool();
+	Rml::FormatString(data.tag_name, "tag %d", Rml::Math::RandomInteger(1'000'000));
+	data.name = is_local ? "local player" : Rml::CreateString("player %d", data.entity_id);
+
+	const auto random_color_component = []() -> uint8_t { return (uint8_t)Rml::Math::RandomInteger(0xff); };
+	data.tag_color = Rml::Colourb(random_color_component(), random_color_component(), random_color_component());
+
+	return data;
+}
+
 void GenerateFakePlayerData(PlayerList* list)
 {
-	const auto generate_fake_player = [](bool is_local) -> PlayerEntry {
-		PlayerEntry data{};
-		data.is_local = is_local;
-		data.entity_id = (uint32_t)Rml::Math::RandomInteger(100'000);
-		data.score = (uint32_t)Rml::Math::RandomInteger(100);
-		data.latency = (uint16_t)Rml::Math::RandomInteger(500);
-		data.is_muted = Rml::Math::RandomBool();
-		data.is_friend = Rml::Math::RandomBool();
-		Rml::FormatString(data.tag_name, "tag %d", Rml::Math::RandomInteger(1'000'000));
-		data.name = is_local ? "local player" : Rml::CreateString("player %d", data.entity_id);
-
-		const auto random_color_component = []() -> uint8_t { return (uint8_t)Rml::Math::RandomInteger(0xff); };
-		data.tag_color = Rml::Colourb(random_color_component(), random_color_component(), random_color_component());
-
-		return data;
-	};
-
 	for (int i = 0; i < GENERATED_PLAYER_COUNT; ++i)
-		list->AddPlayer(generate_fake_player(i == 0));
+		list->AddPlayer(GenerateFakePlayerEntry(i == 0));
 }
