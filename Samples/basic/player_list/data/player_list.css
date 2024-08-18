@@ -97,9 +97,10 @@ input[type="text"] {
 }
 
 #players {
+    width: 100%;
     margin-top: 15dp;
-    flex: auto;
-    overflow: auto;
+    flex: 1;
+    overflow: scroll;
 }
 
 table {
