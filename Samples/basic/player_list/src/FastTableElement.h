@@ -85,6 +85,8 @@ private:
 private:
 	Rml::Element* body;
 
+	// The current element's height during the last update.
+	float last_height;
 	// The height of the closest scrollable container during the last update.
 	float last_scrollable_height;
 	// The scroll offset of the closest scrollable container during the last update.

@@ -109,10 +109,14 @@ public:
 
 	void Update(double t)
 	{
-		if (t < last_update + 2.0)
+		if (t < last_update + 1.0)
 			return;
 
 		RMLUI_ZoneScoped;
+
+		data.erase(data.begin() + 1);
+		data.push_back(GenerateFakePlayerEntry(false));
+		data.push_back(GenerateFakePlayerEntry(false));
 
 		for (PlayerEntry& player : data)
 		{

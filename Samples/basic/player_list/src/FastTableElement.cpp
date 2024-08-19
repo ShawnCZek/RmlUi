@@ -31,7 +31,7 @@
 #include <RmlUi/Core/Profiling.h>
 
 FastTableElement::FastTableElement(const Rml::String& tag) :
-	Element(tag), body(nullptr), last_scrollable_height(0), last_scroll_offset(0), recalculate_elements_order(false)
+	Element(tag), body(nullptr), last_height(0), last_scrollable_height(0), last_scroll_offset(0), recalculate_elements_order(false)
 {}
 
 void FastTableElement::OnChildAdd(Rml::Element* child)
@@ -68,12 +68,15 @@ void FastTableElement::OnUpdate()
 	{
 		float scrollable_height = scrollable_container->GetClientHeight();
 		float scroll_offset = scrollable_container->GetScrollTop();
+		float height = GetClientHeight();
 
-		if (scrollable_height == last_scrollable_height && scroll_offset == last_scroll_offset)
+		// Skip updating the view if the inner content size is relatively the same, the view area size is the same, or the scroll offset did not change.
+		if (Rml::Math::Absolute(last_height - height) < 2.f && scrollable_height == last_scrollable_height && scroll_offset == last_scroll_offset)
 			return;
 
 		UpdateView(scrollable_height, scroll_offset);
 
+		last_height = height;
 		last_scrollable_height = scrollable_height;
 		last_scroll_offset = scroll_offset;
 	}
@@ -81,7 +84,7 @@ void FastTableElement::OnUpdate()
 
 void FastTableElement::UpdateView(float scrollable_height, float scrollable_offset)
 {
-	RMLUI_ZoneScoped;
+	RMLUI_ZoneScopedC(0xB22222);
 
 	if (recalculate_elements_order)
 	{
@@ -108,6 +111,10 @@ void FastTableElement::UpdateView(float scrollable_height, float scrollable_offs
 		float child_offset = child->GetOffsetTop();
 		float child_height = child->GetOffsetHeight();
 
+		// Layouting has not finished for this child.
+		if (child_height == 0)
+			continue;
+
 		if (scrollable_offset > child_offset + child_height)
 		{
 			child->SetProperty(Rml::PropertyId::Display, Rml::Style::Display::None);
@@ -128,10 +135,10 @@ void FastTableElement::UpdateView(float scrollable_height, float scrollable_offs
 		bottom_filler.SortElements();
 	}
 
-	float child_height = CalculateApproximateChildHeight();
-	float scroll_diff = scrollable_offset - last_scroll_offset;
+	const float child_height = CalculateApproximateChildHeight();
+	float top_filler_height = top_filler.element->GetClientHeight();
 
-	while (-scroll_diff > 0.f)
+	while (top_filler_height > scrollable_offset - 5.f)
 	{
 		if (!top_filler.HasHiddenElements())
 			break;
@@ -140,10 +147,13 @@ void FastTableElement::UpdateView(float scrollable_height, float scrollable_offs
 		child->SetProperty(Rml::PropertyId::Display, Rml::Style::Display::TableRow);
 
 		top_filler.RemoveHiddenElement(child);
-		scroll_diff += child_height;
+		top_filler_height -= child_height;
 	}
 
-	while (scroll_diff > 0.f)
+	const float element_height = GetClientHeight();
+	float bottom_filler_height = bottom_filler.element->GetClientHeight();
+
+	while (bottom_filler_height > 0 && scrollable_height + scrollable_offset > element_height - bottom_filler_height)
 	{
 		if (!bottom_filler.HasHiddenElements())
 			break;
@@ -152,7 +162,7 @@ void FastTableElement::UpdateView(float scrollable_height, float scrollable_offs
 		child->SetProperty(Rml::PropertyId::Display, Rml::Style::Display::TableRow);
 
 		bottom_filler.RemoveHiddenElement(child);
-		scroll_diff -= child_height;
+		bottom_filler_height -= child_height;
 	}
 
 	top_filler.UpdateHeight(child_height);
