@@ -4,6 +4,8 @@ set(TARGET_NAME "${RMLUI_SAMPLE_PREFIX}${SAMPLE_NAME}")
 add_executable(${TARGET_NAME} WIN32
 	src/FastTableElement.cpp
 	src/FastTableElement.h
+	src/PlayerList.cpp
+	src/PlayerList.h
 	src/main.cpp
 )
 

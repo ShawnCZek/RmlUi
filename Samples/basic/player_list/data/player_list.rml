@@ -22,7 +22,7 @@
 			</div>
 
 			<div id="players">
-				<table_fast>
+				<table>
 					<thead>
 						<tr>
 							<td class="data_column">ID</td>
@@ -46,7 +46,7 @@
 
 						<tr class="filler_bottom"></tr>
 					</tbody>
-				</table_fast>
+				</table>
 			</div>
 
 			<div id="contents__footer" data-model="player_list">

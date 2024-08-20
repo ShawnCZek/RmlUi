@@ -27,189 +27,13 @@
  */
 
 #include "FastTableElement.h"
+#include "PlayerList.h"
 #include <RmlUi/Core.h>
 #include <RmlUi/Debugger.h>
 #include <RmlUi_Backend.h>
 #include <Shell.h>
 
 static const int GENERATED_PLAYER_COUNT = 150;
-
-class PlayerEntry {
-public:
-	bool is_local;
-	uint32_t entity_id;
-
-	uint32_t score;
-
-	uint16_t latency;
-
-	bool is_muted;
-	bool is_friend;
-
-	Rml::String name;
-
-	Rml::String tag_name;
-	Rml::Colourb tag_color;
-
-public:
-	static void InitializeDataModel(Rml::DataModelConstructor& constructor)
-	{
-		if (auto player = constructor.RegisterStruct<PlayerEntry>())
-		{
-			player.RegisterMember("id", &PlayerEntry::entity_id);
-			player.RegisterMember("score", &PlayerEntry::score);
-			player.RegisterMember("latency", &PlayerEntry::latency);
-			player.RegisterMember("is_muted", &PlayerEntry::is_muted);
-			player.RegisterMember("is_friend", &PlayerEntry::is_friend);
-			player.RegisterMember("name", &PlayerEntry::name);
-			player.RegisterMember("tag_name", &PlayerEntry::tag_name);
-			player.RegisterMember("tag_color", &PlayerEntry::tag_color);
-		}
-	}
-};
-
-PlayerEntry GenerateFakePlayerEntry(bool is_local);
-
-class PlayerList final : public Rml::EventListener {
-public:
-	PlayerList(Rml::Context* context) : last_update(0)
-	{
-		InitializeDataModel(context);
-
-		document = context->LoadDocument("basic/player_list/data/player_list.rml");
-
-		if (document)
-		{
-			document->Show();
-		}
-	}
-
-	void Shutdown()
-	{
-		if (document)
-		{
-			document->Close();
-			document = nullptr;
-		}
-	}
-
-	void ProcessEvent(Rml::Event& event) override
-	{
-		switch (event.GetId())
-		{
-		case Rml::EventId::Keydown:
-		{
-			if (event.GetParameter<int>("key_identifier", 0) == Rml::Input::KI_ESCAPE)
-				Backend::RequestExit();
-		}
-		break;
-		default: break;
-		}
-	}
-
-	void Update(double t)
-	{
-		if (t < last_update + 1.0)
-			return;
-
-		RMLUI_ZoneScoped;
-
-		data.erase(data.begin() + 1);
-		data.push_back(GenerateFakePlayerEntry(false));
-		data.push_back(GenerateFakePlayerEntry(false));
-
-		for (PlayerEntry& player : data)
-		{
-			player.score = (uint32_t)Rml::Math::RandomInteger(100);
-			player.latency = (uint16_t)Rml::Math::RandomInteger(500);
-		}
-
-		Filter();
-		Sort();
-
-		RMLUI_ASSERT(data_model);
-		data_model.DirtyVariable("players");
-
-		last_update = t;
-	}
-
-	Rml::ElementDocument* GetDocument() const { return document; }
-
-	void AddPlayer(PlayerEntry&& player) { data.emplace_back(std::move(player)); }
-
-private:
-	void InitializeDataModel(Rml::Context* context)
-	{
-		if (Rml::DataModelConstructor constructor = context->CreateDataModel("player_list"))
-		{
-			constructor.RegisterScalar<Rml::Colourb>([](const Rml::Colourb& c, Rml::Variant& variant) {
-				variant = Rml::CreateString("rgba(%u, %u, %u, %u)", c.red, c.green, c.blue, c.alpha);
-			});
-
-			constructor.Bind("search_players_query", &search_query);
-
-			PlayerEntry::InitializeDataModel(constructor);
-
-			constructor.RegisterArray<decltype(entries)>();
-			constructor.Bind("players", &entries);
-
-			data_model = constructor.GetModelHandle();
-		}
-	}
-
-	void Filter()
-	{
-		if (search_query.empty())
-		{
-			entries = data;
-			return;
-		}
-
-		const auto search = [](const PlayerEntry& player, const Rml::String& query) -> bool {
-			if (player.is_local)
-				return true;
-
-			Rml::String needle = Rml::StringUtilities::ToLower(player.name);
-			if (needle.find(query) != Rml::String::npos)
-				return true;
-
-			needle = Rml::StringUtilities::ToLower(player.tag_name);
-			if (needle.find(query) != Rml::String::npos)
-				return true;
-
-			return false;
-		};
-
-		// Dump all the current data first.
-		entries.clear();
-
-		// Use lowercase strings for querying.
-		const Rml::String query = Rml::StringUtilities::ToLower(search_query);
-
-		for (const PlayerEntry& player : data)
-			if (search(player, query))
-				entries.emplace_back(player);
-	}
-
-	void Sort()
-	{
-		auto start_it = std::partition(entries.begin(), entries.end(), [](const PlayerEntry& player) { return player.is_local; });
-		std::sort(start_it, entries.end(), [](const PlayerEntry& a, const PlayerEntry& b) { return a.score > b.score; });
-	}
-
-private:
-	Rml::ElementDocument* document;
-	Rml::DataModelHandle data_model;
-
-	double last_update;
-
-	// A collection of all player data from the players manager.
-	Rml::Vector<PlayerEntry> data;
-	// A collection of players that is used in the UI document itself. It may be sorted, filtered out, ...
-	Rml::Vector<PlayerEntry> entries;
-
-	Rml::String search_query;
-};
 
 void GenerateFakePlayerData(PlayerList* list);
 
@@ -260,6 +84,7 @@ int main(int /*argc*/, char** /*argv*/)
 
 	auto player_list = Rml::MakeUnique<PlayerList>(context);
 	context->AddEventListener("keydown", player_list.get());
+	context->AddEventListener("scroll", player_list.get());
 
 	GenerateFakePlayerData(player_list.get());
 
@@ -287,24 +112,6 @@ int main(int /*argc*/, char** /*argv*/)
 	Shell::Shutdown();
 
 	return 0;
-}
-
-PlayerEntry GenerateFakePlayerEntry(bool is_local)
-{
-	PlayerEntry data{};
-	data.is_local = is_local;
-	data.entity_id = (uint32_t)Rml::Math::RandomInteger(100'000);
-	data.score = (uint32_t)Rml::Math::RandomInteger(100);
-	data.latency = (uint16_t)Rml::Math::RandomInteger(500);
-	data.is_muted = Rml::Math::RandomBool();
-	data.is_friend = Rml::Math::RandomBool();
-	Rml::FormatString(data.tag_name, "tag %d", Rml::Math::RandomInteger(1'000'000));
-	data.name = is_local ? "local player" : Rml::CreateString("player %d", data.entity_id);
-
-	const auto random_color_component = []() -> uint8_t { return (uint8_t)Rml::Math::RandomInteger(0xff); };
-	data.tag_color = Rml::Colourb(random_color_component(), random_color_component(), random_color_component());
-
-	return data;
 }
 
 void GenerateFakePlayerData(PlayerList* list)
