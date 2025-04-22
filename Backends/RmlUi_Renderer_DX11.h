@@ -130,8 +130,6 @@ public:
     static constexpr Rml::TextureHandle TextureEnableWithoutBinding = Rml::TextureHandle(-1);
     // Can be passed to RenderGeometry() to leave the bound texture and used program unchanged.
     static constexpr Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);
-    // Can be passed to RenderGeometry() to not touch the cbuffers
-    static constexpr Rml::TextureHandle TexturePostprocessNoBinding = Rml::TextureHandle(-3);
 
 private:
     // Changes blend state if necessary
@@ -178,6 +176,8 @@ private:
     ID3D11Buffer* m_color_matrix_cbuffer = nullptr;
     ID3D11Buffer* m_blur_cbuffer = nullptr;
     ID3D11Buffer* m_drop_shadow_cbuffer = nullptr;
+    ID3D11Buffer* m_gradient_cbuffer = nullptr;
+    ID3D11Buffer* m_creation_cbuffer = nullptr;
     bool m_cbuffer_dirty = true;
     ID3D11SamplerState* m_sampler_state = nullptr;
 
@@ -229,7 +229,9 @@ private:
         // 256 is max according to PSSetShader documentation
         ID3D11ClassInstance *pixel_shader_instances[256], *vertex_shader_instances[256], *geometry_shader_instances[256];
         D3D11_PRIMITIVE_TOPOLOGY primitive_topology;
-        ID3D11Buffer *index_buffer, *vertex_buffer, *vertex_shader_constant_buffer;
+		ID3D11Buffer *index_buffer, *vertex_buffer;
+		ID3D11Buffer* pixel_shader_constant_buffers[2];
+		ID3D11Buffer* vertex_shader_constant_buffers[2];
         UINT index_buffer_offset, vertex_buffer_stride, vertex_buffer_offset;
         DXGI_FORMAT index_buffer_format;
         ID3D11InputLayout* input_layout;
@@ -237,43 +239,36 @@ private:
 
     D3D11State m_previous_d3d_state{};
 
-    #pragma pack(4)
-    union ShaderCbuffer {
-        struct {
-            Rml::Matrix4f transform;
-            Rml::Vector2f translation;
-        } common;
-        struct Gradient {
-            int _padding[18];
-            int func;
-            int num_stops;
-            Rml::Vector2f p;
-            Rml::Vector2f v;
-            Rml::Vector4f stop_colors[16];
-            float stop_positions[16];
-        } gradient;
-        struct Blur {
-            int _padding[18];
-            Rml::Vector2f texel_offset;
-            Rml::Vector4f weights;
-            Rml::Vector2f texcoord_min;
-            Rml::Vector2f texcoord_max;
-        } blur;
-        struct DropShadow {
-            Rml::Vector2f texcoord_min;
-            Rml::Vector2f texcoord_max;
-            Rml::Vector4f color;
-        } drop_shadow;
-        struct Creation {
-            int _padding[18];
-            Rml::Vector2f dimensions;
-            float value;
-        } creation;
-    };
-    struct ColorMatrixCbuffer {
-        Rml::Matrix4f color_matrix;
-    };
-    #pragma pack()
+    struct alignas(16) BlurCBuffer {
+		Rml::Vector4f weights;
+		Rml::Vector2f texel_offset;
+		Rml::Vector2f texcoord_min;
+		Rml::Vector2f texcoord_max;
+	};
+	struct alignas(16) DropShadowCBuffer {
+		Rml::Vector2f texcoord_min;
+		Rml::Vector2f texcoord_max;
+		Rml::Vector4f color;
+	};
+	struct alignas(16) GradientCBuffer {
+		int func;
+		int num_stops;
+		Rml::Vector2f p;
+		Rml::Vector2f v;
+		Rml::Vector4f stop_colors[16];
+		float stop_positions[16];
+	};
+	struct alignas(16) CreationCBuffer {
+		Rml::Vector2f dimensions;
+		float value;
+	};
+	struct alignas(16) ShaderCbuffer {
+		Rml::Matrix4f transform;
+		Rml::Vector2f translation;
+	};
+	struct alignas(16) ColorMatrixCbuffer {
+		Rml::Matrix4f color_matrix;
+	};
 
     Rml::CompiledGeometryHandle m_fullscreen_quad_geometry = 0;
 

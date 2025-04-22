@@ -145,7 +145,10 @@ cbuffer SharedConstantBuffer : register(b0)
 {
     float4x4 m_transform;
     float2 m_translate;
+};
 
+cbuffer GradientConstantBuffer : register(b1)
+{
     // One to one translation of the OpenGL uniforms results in a LOT of wasted space due to CBuffer alignment rules.
     // Changes from GL3:
     // - Moved m_num_stops below m_func (saved 4 bytes of padding).
@@ -221,10 +224,8 @@ struct PS_Input
     float2 uv : TEXCOORD;
 };
 
-cbuffer SharedConstantBuffer : register(b0)
+cbuffer CreationConstantBuffer : register(b1)
 {
-    float4x4 m_transform;
-    float2 m_translate;
     float2 m_dimensions;
     float m_value;
 };
@@ -265,12 +266,6 @@ struct PS_Input
     float2 uv : TEXCOORD;
 };
 
-cbuffer ConstantBuffer : register(b0)
-{
-    float4x4 m_transform;
-    float2 m_translate;
-};
-
 PS_Input VSMain(const VS_Input IN)
 {
     PS_Input result = (PS_Input)0;
@@ -300,7 +295,6 @@ float4 PSMain(const PS_Input IN) : SV_TARGET
 )";
 
 static const char shader_frag_color_matrix[] = RMLUI_SHADER_HEADER R"(
-
 Texture2D g_InputTexture : register(t0);
 SamplerState g_SamplerLinear : register(s0);
 
@@ -367,12 +361,10 @@ struct PS_INPUT
     float2 uv[BLUR_SIZE] : TEXCOORD;
 };
 
-cbuffer SharedConstantBuffer : register(b0)
+cbuffer BlurBuffer : register(b1)
 {
-    float4x4 m_transform;
-    float2 m_translate;
-    float2 m_texelOffset;
     float4 m_weights;
+    float2 m_texelOffset;
     float2 m_texCoordMin;
     float2 m_texCoordMax;
 };
@@ -394,12 +386,10 @@ static const char shader_frag_blur[] = RMLUI_SHADER_BLUR_HEADER R"(
 Texture2D g_InputTexture : register(t0);
 SamplerState g_SamplerLinear : register(s0);
 
-cbuffer SharedConstantBuffer : register(b0)
+cbuffer BlurBuffer : register(b1)
 {
-    float4x4 m_transform;
-    float2 m_translate;
-    float2 m_texelOffset;
     float4 m_weights;
+    float2 m_texelOffset;
     float2 m_texCoordMin;
     float2 m_texCoordMax;
 };
@@ -598,6 +588,26 @@ static bool CreateShader(ID3DBlob*& out_shader_dxil, ShaderType shader_type, con
     DX_CLEANUP_RESOURCE_IF_CREATED(p_error_buff);
 
     return true;
+}
+
+static void CreateConstantBuffer(ID3D11Device* device, ID3D11Buffer*& out_buffer, UINT size)
+{
+	D3D11_BUFFER_DESC desc{};
+	desc.Usage = D3D11_USAGE_DYNAMIC;
+	desc.ByteWidth = size;
+	desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	desc.MiscFlags = 0;
+	desc.StructureByteStride = 0;
+
+	HRESULT result = device->CreateBuffer(&desc, nullptr, &out_buffer);
+	RMLUI_DX_ASSERTMSG(result, "Failed to create a constant buffer.");
+#ifdef RMLUI_DX_DEBUG
+	if (FAILED(result))
+	{
+		Rml::Log::Message(Rml::Log::Type::LT_ERROR, "Failed to create a constant buffer: %d", result);
+	}
+#endif
 }
 
 static bool CreateProgram(ID3D11Device* p_device, ShaderProgram& out_program, ID3DBlob* vertex_shader, ID3DBlob* fragment_shader)
@@ -974,62 +984,12 @@ void RenderInterface_DX11::Init(ID3D11Device* p_d3d_device)
 
     // Create constant buffers. This is so that we can bind uniforms such as translation and color to the shaders.
     {
-        D3D11_BUFFER_DESC cbufferDesc{};
-        cbufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        cbufferDesc.ByteWidth = sizeof(ShaderCbuffer);
-        cbufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        cbufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        cbufferDesc.MiscFlags = 0;
-        cbufferDesc.StructureByteStride = 0;
-
-        HRESULT result = m_d3d_device->CreateBuffer(&cbufferDesc, nullptr, &m_shader_buffer);
-        RMLUI_DX_ASSERTMSG(result, "failed to CreateBuffer");
-        if (FAILED(result))
-        {
-            return;
-        }
-
-        cbufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        cbufferDesc.ByteWidth = sizeof(ColorMatrixCbuffer);
-        cbufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        cbufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        cbufferDesc.MiscFlags = 0;
-        cbufferDesc.StructureByteStride = 0;
-
-        result = m_d3d_device->CreateBuffer(&cbufferDesc, nullptr, &m_color_matrix_cbuffer);
-        RMLUI_DX_ASSERTMSG(result, "failed to CreateBuffer");
-        if (FAILED(result))
-        {
-            return;
-        }
-
-        cbufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        cbufferDesc.ByteWidth = sizeof(ShaderCbuffer::Blur);
-        cbufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        cbufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        cbufferDesc.MiscFlags = 0;
-        cbufferDesc.StructureByteStride = 0;
-
-        result = m_d3d_device->CreateBuffer(&cbufferDesc, nullptr, &m_blur_cbuffer);
-        RMLUI_DX_ASSERTMSG(result, "failed to CreateBuffer");
-        if (FAILED(result))
-        {
-            return;
-        }
-
-        cbufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        cbufferDesc.ByteWidth = sizeof(ShaderCbuffer::DropShadow);
-        cbufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        cbufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        cbufferDesc.MiscFlags = 0;
-        cbufferDesc.StructureByteStride = 0;
-
-        result = m_d3d_device->CreateBuffer(&cbufferDesc, nullptr, &m_drop_shadow_cbuffer);
-        RMLUI_DX_ASSERTMSG(result, "failed to CreateBuffer");
-        if (FAILED(result))
-        {
-            return;
-        }
+		Gfx::CreateConstantBuffer(m_d3d_device, m_shader_buffer, sizeof(ShaderCbuffer));
+		Gfx::CreateConstantBuffer(m_d3d_device, m_color_matrix_cbuffer, sizeof(ColorMatrixCbuffer));
+		Gfx::CreateConstantBuffer(m_d3d_device, m_blur_cbuffer, sizeof(BlurCBuffer));
+		Gfx::CreateConstantBuffer(m_d3d_device, m_drop_shadow_cbuffer, sizeof(DropShadowCBuffer));
+		Gfx::CreateConstantBuffer(m_d3d_device, m_gradient_cbuffer, sizeof(GradientCBuffer));
+		Gfx::CreateConstantBuffer(m_d3d_device, m_creation_cbuffer, sizeof(CreationCBuffer));
     }
 
     // Create sampler state for textures
@@ -1132,6 +1092,8 @@ void RenderInterface_DX11::Cleanup()
     DX_CLEANUP_RESOURCE_IF_CREATED(m_color_matrix_cbuffer);
     DX_CLEANUP_RESOURCE_IF_CREATED(m_blur_cbuffer);
     DX_CLEANUP_RESOURCE_IF_CREATED(m_drop_shadow_cbuffer);
+    DX_CLEANUP_RESOURCE_IF_CREATED(m_gradient_cbuffer);
+    DX_CLEANUP_RESOURCE_IF_CREATED(m_creation_cbuffer);
     DX_CLEANUP_RESOURCE_IF_CREATED(m_vertex_layout);
     DX_CLEANUP_RESOURCE_IF_CREATED(m_d3d_context);
     DX_CLEANUP_RESOURCE_IF_CREATED(m_d3d_device_1);
@@ -1162,7 +1124,8 @@ void RenderInterface_DX11::BeginFrame(ID3D11RenderTargetView* p_render_target_vi
             &m_previous_d3d_state.pixel_shader_instances_count);
         m_d3d_context->VSGetShader(&m_previous_d3d_state.vertex_shader, m_previous_d3d_state.vertex_shader_instances,
             &m_previous_d3d_state.vertex_shader_instances_count);
-        m_d3d_context->VSGetConstantBuffers(0, 1, &m_previous_d3d_state.vertex_shader_constant_buffer);
+		m_d3d_context->PSGetConstantBuffers(0, 2, m_previous_d3d_state.pixel_shader_constant_buffers);
+		m_d3d_context->VSGetConstantBuffers(0, 2, m_previous_d3d_state.vertex_shader_constant_buffers);
         m_d3d_context->GSGetShader(&m_previous_d3d_state.geometry_shader, m_previous_d3d_state.geometry_shader_instances,
             &m_previous_d3d_state.geometry_shader_instances_count);
 
@@ -1191,8 +1154,11 @@ void RenderInterface_DX11::BeginFrame(ID3D11RenderTargetView* p_render_target_vi
     m_stencil_ref_value = 0; // Reset stencil
     m_d3d_context->OMSetDepthStencilState(m_depth_stencil_state_disable, 0);
     Clear();
-    
+
     SetTransform(nullptr);
+
+	m_d3d_context->VSSetConstantBuffers(0, 1, &m_shader_buffer);
+	m_d3d_context->PSSetConstantBuffers(0, 1, &m_shader_buffer);
 
     m_render_layers.BeginFrame(m_viewport_width, m_viewport_height);
     Gfx::BindRenderTarget(m_d3d_context, m_render_layers.GetTopLayer());
@@ -1278,11 +1244,12 @@ void RenderInterface_DX11::EndFrame()
         {
             m_previous_d3d_state.vertex_shader->Release();
         }
-        m_d3d_context->VSSetConstantBuffers(0, 1, &m_previous_d3d_state.vertex_shader_constant_buffer);
-        if (m_previous_d3d_state.vertex_shader_constant_buffer)
-        {
-            m_previous_d3d_state.vertex_shader_constant_buffer->Release();
-        }
+		m_d3d_context->PSSetConstantBuffers(0, 2, m_previous_d3d_state.pixel_shader_constant_buffers);
+		DX_CLEANUP_RESOURCE_IF_CREATED(m_previous_d3d_state.pixel_shader_constant_buffers[0]);
+		DX_CLEANUP_RESOURCE_IF_CREATED(m_previous_d3d_state.pixel_shader_constant_buffers[1]);
+		m_d3d_context->VSSetConstantBuffers(0, 2, m_previous_d3d_state.vertex_shader_constant_buffers);
+		DX_CLEANUP_RESOURCE_IF_CREATED(m_previous_d3d_state.vertex_shader_constant_buffers[0]);
+		DX_CLEANUP_RESOURCE_IF_CREATED(m_previous_d3d_state.vertex_shader_constant_buffers[1]);
         m_d3d_context->GSSetShader(m_previous_d3d_state.geometry_shader, m_previous_d3d_state.geometry_shader_instances,
             m_previous_d3d_state.geometry_shader_instances_count);
         if (m_previous_d3d_state.geometry_shader)
@@ -1398,7 +1365,7 @@ void RenderInterface_DX11::RenderGeometry(Rml::CompiledGeometryHandle handle, Rm
         m_cbuffer_dirty = true;
     }
 
-    if (texture == TexturePostprocess || texture == TexturePostprocessNoBinding)
+    if (texture == TexturePostprocess)
     {
         // Do nothing.
     }
@@ -1419,13 +1386,7 @@ void RenderInterface_DX11::RenderGeometry(Rml::CompiledGeometryHandle handle, Rm
         UseProgram(ProgramId::Color);
     }
 
-    if (texture != TexturePostprocessNoBinding)
-    {
-        UpdateConstantBuffer();
-
-        m_d3d_context->VSSetConstantBuffers(0, 1, &m_shader_buffer);
-        m_d3d_context->PSSetConstantBuffers(0, 1, &m_shader_buffer);
-    }
+	UpdateConstantBuffer();
 
     // Bind vertex and index buffers, issue draw call
     uint32_t stride = sizeof(Rml::Vertex);
@@ -2222,8 +2183,6 @@ void RenderInterface_DX11::RenderShader(Rml::CompiledShaderHandle shader_handle,
     const CompiledShader& shader = *reinterpret_cast<CompiledShader*>(shader_handle);
     const CompiledShaderType type = shader.type;
 
-    DX11_GeometryData* geometry = (DX11_GeometryData*)geometry_handle;
-
     switch (type)
     {
     case CompiledShaderType::Gradient:
@@ -2235,42 +2194,34 @@ void RenderInterface_DX11::RenderShader(Rml::CompiledShaderHandle shader_handle,
 
         D3D11_MAPPED_SUBRESOURCE mappedResource{};
         // Lock the constant buffer so it can be written to.
-        HRESULT result = m_d3d_context->Map(m_shader_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        HRESULT result = m_d3d_context->Map(m_gradient_cbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if (FAILED(result))
         {
             return;
         }
 
         // Get a pointer to the data in the constant buffer.
-        ShaderCbuffer* dataPtr = (ShaderCbuffer*)mappedResource.pData;
+		GradientCBuffer* dataPtr = (GradientCBuffer*)mappedResource.pData;
 
         // Copy the data to the GPU
-        dataPtr->common.transform = m_transform;
-        dataPtr->common.translation = translation;
-        dataPtr->gradient.func = static_cast<int>(shader.gradient_function);
-        dataPtr->gradient.p = shader.p;
-        dataPtr->gradient.v = shader.v;
-        dataPtr->gradient.num_stops = num_stops;
+        dataPtr->func = static_cast<int>(shader.gradient_function);
+        dataPtr->p = shader.p;
+        dataPtr->v = shader.v;
+        dataPtr->num_stops = num_stops;
         // Reset stop positions and colours to 0
-        memset(dataPtr->gradient.stop_positions, 0, sizeof(dataPtr->gradient.stop_positions));
-        memset(dataPtr->gradient.stop_colors, 0, sizeof(dataPtr->gradient.stop_colors));
+        memset(dataPtr->stop_positions, 0, sizeof(dataPtr->stop_positions));
+        memset(dataPtr->stop_colors, 0, sizeof(dataPtr->stop_colors));
         // Copy to stop position and colours
-        memcpy_s(&dataPtr->gradient.stop_positions, num_stops * sizeof(float), shader.stop_positions.data(), num_stops * sizeof(float));
-        memcpy_s(&dataPtr->gradient.stop_colors, num_stops * sizeof(Rml::Vector4f), shader.stop_colors.data(), num_stops * sizeof(Rml::Vector4f));
+        memcpy_s(&dataPtr->stop_positions, num_stops * sizeof(float), shader.stop_positions.data(), num_stops * sizeof(float));
+        memcpy_s(&dataPtr->stop_colors, num_stops * sizeof(Rml::Vector4f), shader.stop_colors.data(), num_stops * sizeof(Rml::Vector4f));
 
         // Upload to the GPU.
-        m_d3d_context->Unmap(m_shader_buffer, 0);
+		m_d3d_context->Unmap(m_gradient_cbuffer, 0);
 
         // Issue draw call
-        m_d3d_context->IASetInputLayout(m_vertex_layout);
-        m_d3d_context->VSSetConstantBuffers(0, 1, &m_shader_buffer);
-        m_d3d_context->PSSetConstantBuffers(0, 1, &m_shader_buffer);
-        uint32_t stride = sizeof(Rml::Vertex);
-        uint32_t offset = 0;
-        m_d3d_context->IASetVertexBuffers(0, 1, &geometry->vertex_buffer, &stride, &offset);
-        m_d3d_context->IASetIndexBuffer(geometry->index_buffer, DXGI_FORMAT_R32_UINT, 0);
-        m_d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        m_d3d_context->DrawIndexed(static_cast<UINT>(geometry->index_count), 0, 0);
+		m_d3d_context->VSSetConstantBuffers(1, 1, &m_gradient_cbuffer);
+		m_d3d_context->PSSetConstantBuffers(1, 1, &m_gradient_cbuffer);
+		RenderGeometry(geometry_handle, translation, TexturePostprocess);
     }
     break;
     case CompiledShaderType::Creation:
@@ -2281,34 +2232,26 @@ void RenderInterface_DX11::RenderShader(Rml::CompiledShaderHandle shader_handle,
 
         D3D11_MAPPED_SUBRESOURCE mappedResource{};
         // Lock the constant buffer so it can be written to.
-        HRESULT result = m_d3d_context->Map(m_shader_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        HRESULT result = m_d3d_context->Map(m_creation_cbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if (FAILED(result))
         {
             return;
         }
 
         // Get a pointer to the data in the constant buffer.
-        ShaderCbuffer* dataPtr = (ShaderCbuffer*)mappedResource.pData;
+		CreationCBuffer* dataPtr = (CreationCBuffer*)mappedResource.pData;
 
         // Copy the data to the GPU
-        dataPtr->common.transform = m_transform;
-        dataPtr->common.translation = translation;
-        dataPtr->creation.value = (float)time;
-        dataPtr->creation.dimensions = shader.dimensions;
+        dataPtr->value = (float)time;
+        dataPtr->dimensions = shader.dimensions;
 
         // Upload to the GPU.
-        m_d3d_context->Unmap(m_shader_buffer, 0);
+		m_d3d_context->Unmap(m_creation_cbuffer, 0);
 
         // Issue draw call
-        m_d3d_context->IASetInputLayout(m_vertex_layout);
-        m_d3d_context->VSSetConstantBuffers(0, 1, &m_shader_buffer);
-        m_d3d_context->PSSetConstantBuffers(0, 1, &m_shader_buffer);
-        uint32_t stride = sizeof(Rml::Vertex);
-        uint32_t offset = 0;
-        m_d3d_context->IASetVertexBuffers(0, 1, &geometry->vertex_buffer, &stride, &offset);
-        m_d3d_context->IASetIndexBuffer(geometry->index_buffer, DXGI_FORMAT_R32_UINT, 0);
-        m_d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        m_d3d_context->DrawIndexed(static_cast<UINT>(geometry->index_count), 0, 0);
+		m_d3d_context->VSSetConstantBuffers(1, 1, &m_creation_cbuffer);
+		m_d3d_context->PSSetConstantBuffers(1, 1, &m_creation_cbuffer);
+		RenderGeometry(geometry_handle, translation, TexturePostprocess);
     }
     break;
     case CompiledShaderType::Invalid:
@@ -2446,26 +2389,26 @@ void RenderInterface_DX11::RenderBlur(float sigma, const Gfx::RenderTargetData& 
     UseProgram(ProgramId::Blur);
     D3D11_MAPPED_SUBRESOURCE mappedResource{};
     // Lock the constant buffer so it can be written to.
-    HRESULT result = m_d3d_context->Map(m_shader_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    HRESULT result = m_d3d_context->Map(m_blur_cbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if (FAILED(result))
     {
         return;
     }
 
     // Get a pointer to the data in the constant buffer.
-    ShaderCbuffer* dataPtr = (ShaderCbuffer*)mappedResource.pData;
+	BlurCBuffer* dataPtr = (BlurCBuffer*)mappedResource.pData;
 
-    SetBlurWeights(dataPtr->blur.weights, sigma);
-    SetTexCoordLimits(dataPtr->blur.texcoord_min, dataPtr->blur.texcoord_max, scissor, {source_destination.width, source_destination.height});
+    SetBlurWeights(dataPtr->weights, sigma);
+    SetTexCoordLimits(dataPtr->texcoord_min, dataPtr->texcoord_max, scissor, {source_destination.width, source_destination.height});
 
     Rml::Vector2f texel_offset = Rml::Vector2f(0.f, 1.f) * (1.0f / float(temp.height));
-    dataPtr->blur.texel_offset = texel_offset;
+    dataPtr->texel_offset = texel_offset;
 
     // Upload to the GPU.
-    m_d3d_context->Unmap(m_shader_buffer, 0);
-    // Unbind second pass
-    ID3D11Buffer* null_buffer = nullptr;
-    m_d3d_context->VSSetConstantBuffers(1, 1, &null_buffer);
+	m_d3d_context->Unmap(m_blur_cbuffer, 0);
+
+	m_d3d_context->VSSetConstantBuffers(1, 1, &m_blur_cbuffer);
+	m_d3d_context->PSSetConstantBuffers(1, 1, &m_blur_cbuffer);
 
     // Blur render pass - vertical.
     Gfx::BindRenderTarget(m_d3d_context, source_destination);
@@ -2511,16 +2454,18 @@ void RenderInterface_DX11::RenderBlur(float sigma, const Gfx::RenderTargetData& 
         return;
     }
 
-    ShaderCbuffer::Blur* dataPtrBlur = (ShaderCbuffer::Blur*)mappedResource.pData;
+	dataPtr = (BlurCBuffer*)mappedResource.pData;
 
-    texel_offset = Rml::Vector2f(1.f, 0.f) * (1.0f / float(source_destination.width));
-    dataPtrBlur->texel_offset = texel_offset;
+	SetBlurWeights(dataPtr->weights, sigma);
+	SetTexCoordLimits(dataPtr->texcoord_min, dataPtr->texcoord_max, scissor, {source_destination.width, source_destination.height});
+
+	texel_offset = Rml::Vector2f(1.f, 0.f) * (1.0f / float(source_destination.width));
+	dataPtr->texel_offset = texel_offset;
 
     // Upload to the GPU.
     m_d3d_context->Unmap(m_blur_cbuffer, 0);
-    m_d3d_context->VSSetConstantBuffers(0, 1, &m_blur_cbuffer);
 
-    RenderGeometry(m_fullscreen_quad_geometry, {}, RenderInterface_DX11::TexturePostprocessNoBinding);
+    DrawFullscreenQuad();
 
     // Blit the blurred image to the scissor region with upscaling.
     Rml::Rectanglei window_flipped_twice = VerticallyFlipped(window_flipped, m_viewport_height);
@@ -2625,7 +2570,7 @@ void RenderInterface_DX11::RenderFilters(Rml::Span<const Rml::CompiledFilterHand
             }
 
             // Get a pointer to the data in the constant buffer.
-            ShaderCbuffer::DropShadow* dataPtr = (ShaderCbuffer::DropShadow*)mappedResource.pData;
+			DropShadowCBuffer* dataPtr = (DropShadowCBuffer*)mappedResource.pData;
 
             Rml::Colourf color = ConvertToColorf(filter.color);
 
@@ -2709,10 +2654,6 @@ void RenderInterface_DX11::RenderFilters(Rml::Span<const Rml::CompiledFilterHand
 
             DrawFullscreenQuad();
 
-            // Unbind cbuffer
-            ID3D11Buffer* null_cbuffer = nullptr;
-            m_d3d_context->PSSetConstantBuffers(1, 1, &null_cbuffer);
-
             m_render_layers.SwapPostprocessPrimarySecondary();
 
             // Restore blend state
@@ -2773,8 +2714,8 @@ void RenderInterface_DX11::UpdateConstantBuffer()
         ShaderCbuffer* dataPtr = (ShaderCbuffer*)mappedResource.pData;
 
         // Copy the data to the GPU
-        dataPtr->common.transform = m_transform;
-        dataPtr->common.translation = m_translation;
+        dataPtr->transform = m_transform;
+        dataPtr->translation = m_translation;
 
         // Upload to the GPU.
         m_d3d_context->Unmap(m_shader_buffer, 0);
